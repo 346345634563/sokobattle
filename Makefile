@@ -6,7 +6,7 @@ SRC = $(wildcard src/**/*.c src/*.c)
 
 RAYLIB = -lraylib -lm
 
-CFLAGS = -Wall -Wextra -Isrc 
+CFLAGS = -Wall -Wextra -g -Isrc 
 
 all: $(TARGET)
 

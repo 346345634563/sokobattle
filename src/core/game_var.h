@@ -1,8 +1,8 @@
 #ifndef GAME_VAR_H_
 #define GAME_VAR_H_
 
-#define SCREEN_HEIGHT   400
-#define SCREEN_WIDTH    750
+#define SCREEN_HEIGHT   1080
+#define SCREEN_WIDTH    1920
 
 extern int GLOBAL_GAME_STATE[2];
 extern int GLOBAL_INTERFACE_INDEX;

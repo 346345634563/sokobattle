@@ -64,6 +64,8 @@ bool Is_Game_Over(Board_State b);
 bool Is_Game_Over_Handler(Board* b);
 void Play_Update(Board* b);
 void Free_Board(Board* b);
+void Draw_Board(const Map map, const Board_State state);
+
 
 
 #endif // BOARD_H

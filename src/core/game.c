@@ -14,6 +14,8 @@ void Game_Init(Game *g){
     GLOBAL_GAME_STATE[0] = GAME_STATE_MENU;
     GLOBAL_INTERFACE_INDEX = 0;
 
+
+
     log_info("%s finished", __func__);
 }
 
@@ -66,8 +68,7 @@ void Game_Render(Game *g){
             Menu_Draw();
             break;
         case GAME_STATE_PLAYING:
-
-            
+            Playing_Draw();
             break;
         case GAME_STATE_PAUSE:
             break;

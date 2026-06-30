@@ -5,18 +5,16 @@
 
 #include "game_var.h"
 #include "gameplay/board.h"
-#include "graphics/board_"
 
-enum{
-    PLAYING_,
+typedef enum{
+    PLAYING_CURRENT,
     PLAYING_NEXT_LEVEL
-}
+}Playing_State;
 
 
 void Playing_Init();
 void Playing_Update();
 void Playing_Draw();
-void Playing_Clean();
 
 
 
