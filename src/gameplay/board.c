@@ -138,7 +138,6 @@ void Make_Move(Map map, Board_State* b, Move move){
         return;
     }
 
-    // Vérifier si une boîte est sur la case cible
     int box_idx = -1;
     for(int i = 0; i < b->num_boxes; i++){
         if(b->boxes[i].x == tx && b->boxes[i].y == ty){
@@ -148,33 +147,30 @@ void Make_Move(Map map, Board_State* b, Move move){
     }
 
     if(box_idx >= 0){
-        int bx2 = tx + dx; // colonne derrière la boîte
-        int by2 = ty + dy; // ligne derrière la boîte
+        int bx2 = tx + dx; 
+        int by2 = ty + dy; 
 
-        // Limites
         if(bx2 < 0 || bx2 >= map.width || by2 < 0 || by2 >= map.height)
             return;
 
-        // Mur derrière
         if(map.tiles[by2][bx2] == TILE_WALL)
             return;
 
-        // Autre boîte derrière
         for(int i = 0; i < b->num_boxes; i++){
             if(i == box_idx) continue;
             if(b->boxes[i].x == bx2 && b->boxes[i].y == by2)
                 return;
         }
 
-        // Déplacer la boîte
         b->boxes[box_idx].x = bx2;
         b->boxes[box_idx].y = by2;
     }
 
-    // Déplacer le joueur
     b->p1.x = tx;
     b->p1.y = ty;
 }
+
+
 
 bool Is_Game_Over(Board_State b){
 
@@ -193,14 +189,7 @@ bool Is_Game_Over(Board_State b){
     return true;
 }
 
-void Free_Board(Board* b) {
-    if (b->map.tiles) {
-        for (int i = 0; i < b->map.height; i++) {
-            free(b->map.tiles[i]);
-        }
-        free(b->map.tiles);
-        b->map.tiles = NULL;
-    }
+void Free_Board_State(Board* b){
     free(b->board_state.boxes);
     free(b->board_state.goals);
     b->board_state.boxes = NULL;
@@ -209,6 +198,32 @@ void Free_Board(Board* b) {
     b->board_state.num_goals = 0;
 }
 
+void Free_Board(Board* b) {
+    if (b->map.tiles) {
+        for (int i = 0; i < b->map.height; i++) {
+            free(b->map.tiles[i]);
+        }
+        free(b->map.tiles);
+        b->map.tiles = NULL;
+    }
+    Free_Board_State(b->board_state);
+}
+
+
+void Copy_Board_State(Board_State* a, Board_State* b){
+    
+    b->num_boxes = a->num_boxes;
+    b->num_goals = a->num_goals;
+    b->p1.x = a->p1.x;
+    b->p1.y = a->p1.y;
+    b->goals = malloc(num_goals * sizeof(box));
+    b->boxes = malloc(num_boxes * sizeof(goal));
+
+    for (int i = 0; i < b->num_boxes; i++){
+        b->goals[i] = a->goals[i];
+        b->boxes[i] = a->boxes[i];
+    }
+}
 
 bool Is_Game_Over_Handler(Board* b){
     if(Is_Game_Over(b->board_state)){
@@ -229,6 +244,6 @@ void Play_Update(Board* b){
         Make_Move(b->map, &b->board_state, MOVE_LEFT);
     }
 
-
 }
+
 

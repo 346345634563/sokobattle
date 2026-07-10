@@ -6,8 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "core/game_var.h"
 #include "raylib.h"
-#include "../util/log.h"
+#include "util/log.h"
 
 typedef enum {
     TILE_EMPTY = 0,
@@ -19,7 +20,8 @@ typedef enum {
     MOVE_UP,
     MOVE_DOWN,
     MOVE_LEFT,
-    MOVE_RIGHT
+    MOVE_RIGHT,
+    MOVE_COUNT
 } Move;
 
 // 0,0 -> the uppermost left tile
@@ -63,9 +65,12 @@ void Make_Move(Map map, Board_State* b, Move move);
 bool Is_Game_Over(Board_State b);
 bool Is_Game_Over_Handler(Board* b);
 void Play_Update(Board* b);
+void Free_Board_State(Board_state* b);
 void Free_Board(Board* b);
+Board_State* Copy_Board_State(Board_State* b);
 void Draw_Board(const Map map, const Board_State state);
 
 
 
-#endif // BOARD_H
+
+#endif
