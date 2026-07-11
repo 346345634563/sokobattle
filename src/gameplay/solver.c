@@ -85,20 +85,23 @@ Linked_List solve(const Map m, Board_State b){
     Hashset_Init(visited);
 
 
-    Board_State* current;
-    Board_State* next;
+    // we add an initial state
 
-    while(!Is_Empty){
+    while(true){
 
-        int g = Prio_Queue_Val(&pq);
-        Board_State* current = Prio_Queue_Pop(&pq);
+        Node_Prio* current = Prio_Queue_Pop(&pq);
+        
+        // the priority queue is empty
+        if(current == NULL){
+            break;
+        }
 
-        if(Is_Game_Over(Prio_Queue_Poll(pq))){
+        if(Is_Game_Over(current->board_state)){
             goto clean_up;   
         }
         
-        int h = INT_MAX;
-        int action = 0;
+    
+
         for(int i = 0; i < MOVE_COUNT; i++){
             
             Board_State* new_state = Make_Move_(m, current, i);
