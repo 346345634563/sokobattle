@@ -56,18 +56,21 @@ typedef struct map {
 
 typedef struct board {
     Map map;
+    uint16_t score;
     Board_State board_state;
+    Board_State initial_board_state;
 } Board;
 
 
-void Load_Level(Board* b, char* filename);
+void Load_Level(Board* b, const char* filename);
 void Make_Move(Map map, Board_State* b, Move move);
+bool Is_Solvable(Map map, Board_State* b);
 bool Is_Game_Over(Board_State b);
 bool Is_Game_Over_Handler(Board* b);
-void Play_Update(Board* b);
-void Free_Board_State(Board_state* b);
+void Free_Board_State(Board_State* b);
 void Free_Board(Board* b);
-Board_State* Copy_Board_State(Board_State* b);
+Board_State* Copy_Board_State(const Board_State* src); 
+void Copy_Board_State_Reset(Board_State* a, Board_State* b);
 void Draw_Board(const Map map, const Board_State state);
 
 

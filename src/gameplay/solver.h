@@ -12,8 +12,8 @@
 
 Board_State* Make_Move_Solver(Map map, Board_State* a, Move move);
 
-Linked_List* solve(const Map m, Board_State b);
-int heuristic(const Board_State b);
+Linked_List* solve(const Map m,  Board_State b);
+int heuristic(const Board_State* b);
 
 
 #endif

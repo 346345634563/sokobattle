@@ -7,11 +7,9 @@ void Linked_List_Init(Linked_List* l) {
     l->size = 0;
 }
 
-void Linked_List_Append(Linked_List* l, void* val) {
-    Node* new_node = (Node*)malloc(sizeof(Node));
-    if (!new_node){
-        return;   
-    }
+void Linked_List_Append(Linked_List* l, Move val) {
+    Node* new_node = malloc(sizeof(Node));
+    if (!new_node) return;
     new_node->val = val;
     new_node->next = NULL;
 
@@ -25,21 +23,15 @@ void Linked_List_Append(Linked_List* l, void* val) {
     l->size++;
 }
 
-void* Linked_List_Pop(Linked_List* l) {
-    
-    if (l->size == 0){
-        return NULL;
-    }
-
-    void* val;
+Move Linked_List_Pop(Linked_List* l) {
+    if (l->size == 0) return -1;  
+    Move val;
     if (l->size == 1) {
         val = l->head->val;
         free(l->head);
         l->head = NULL;
         l->tail = NULL;
     } else {
-       
-        
         Node* current = l->head;
         while (current->next != l->tail) {
             current = current->next;
@@ -49,25 +41,44 @@ void* Linked_List_Pop(Linked_List* l) {
         l->tail = current;
         l->tail->next = NULL;
     }
-    
     l->size--;
-    
     return val;
 }
 
 void Linked_List_Clean(Linked_List* l) {
-    
     Node* current = l->head;
-
-    while (current != NULL) {
+    while (current) {
         Node* next = current->next;
-        free(current->val);   
         free(current);
         current = next;
     }
-
     l->head = NULL;
     l->tail = NULL;
     l->current = NULL;
     l->size = 0;
+}
+
+void Linked_List_Reverse(Linked_List* l) {
+    Node* prev = NULL;
+    Node* curr = l->head;
+    Node* next = NULL;
+    while (curr) {
+        next = curr->next;
+        curr->next = prev;
+        prev = curr;
+        curr = next;
+    }
+    l->tail = l->head;   
+    l->head = prev;      
+}
+
+void Linked_List_Print(Linked_List* l) {
+    if (!l) return;
+    const char* move_names[] = {"N", "E", "S", "W"};
+    Node* curr = l->head;
+    while (curr) {
+        printf("%s ", move_names[curr->val]);
+        curr = curr->next;
+    }
+    printf("\n");
 }

@@ -5,6 +5,7 @@
 
 #include "game_var.h"
 #include "gameplay/board.h"
+#include "gameplay/solver.h"
 
 typedef enum{
     PLAYING_CURRENT,
@@ -12,10 +13,12 @@ typedef enum{
 }Playing_State;
 
 
+
+
 void Playing_Init();
 void Playing_Update();
 void Playing_Draw();
-
+void Playing_Board_Update(Board* b);
 
 
 

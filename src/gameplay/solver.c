@@ -8,8 +8,7 @@
 
 Board_State* Make_Move_Solver(Map map, Board_State* a, Move move){
     
-    Board_State* b;
-    Copy_Board_State(a, b);
+    Board_State* b = Copy_Board_State(a);
 
     int dx = 0, dy = 0;
     switch(move){
@@ -17,7 +16,7 @@ Board_State* Make_Move_Solver(Map map, Board_State* a, Move move){
         case MOVE_DOWN:  dx =  0; dy =  1; break;
         case MOVE_LEFT:  dx = -1; dy =  0; break;
         case MOVE_RIGHT: dx =  1; dy =  0; break;
-        default: return;
+        default: return NULL;
     }
 
     uint8_t x = b->p1.x;
@@ -26,11 +25,12 @@ Board_State* Make_Move_Solver(Map map, Board_State* a, Move move){
     int tx = x + dx; 
     int ty = y + dy; 
 
-    if (tx < 0 || tx >= map.width || ty < 0 || ty >= map.height)
-        return;
+    if (tx < 0 || tx >= map.width || ty < 0 || ty >= map.height){
+        return NULL;
+    }
 
     if(map.tiles[ty][tx] == TILE_WALL){
-        return;
+        return NULL;
     }
 
     int box_idx = -1;
@@ -45,16 +45,23 @@ Board_State* Make_Move_Solver(Map map, Board_State* a, Move move){
         int bx2 = tx + dx; 
         int by2 = ty + dy; 
 
-        if(bx2 < 0 || bx2 >= map.width || by2 < 0 || by2 >= map.height)
-            return;
+        if(bx2 < 0 || bx2 >= map.width || by2 < 0 || by2 >= map.height){
+            return NULL;
+        }
 
-        if(map.tiles[by2][bx2] == TILE_WALL)
-            return;
+        if(map.tiles[by2][bx2] == TILE_WALL){
+            return NULL;
+        }
 
         for(int i = 0; i < b->num_boxes; i++){
-            if(i == box_idx) continue;
-            if(b->boxes[i].x == bx2 && b->boxes[i].y == by2)
-                return;
+            if(i == box_idx){
+                continue;
+            }
+
+            if(b->boxes[i].x == bx2 && b->boxes[i].y == by2){
+                return NULL;
+            }
+
         }
 
         b->boxes[box_idx].x = bx2;
@@ -68,78 +75,85 @@ Board_State* Make_Move_Solver(Map map, Board_State* a, Move move){
 }
 
 
+Linked_List* solve(const Map m, Board_State b) {
+    log_info("Attempting to solve");
 
-// this solver implements ida* since the memory we have is
-// often very limited
-// f = g + h 
-Linked_List solve(const Map m, Board_State b){
-    
-    Linked_List solution;
-    Init_Linked_List(&solution);
+    Board_State* init_copy = Copy_Board_State(&b);
+    if (!init_copy){
+        return NULL;
+    }
 
     Prio_Queue pq;
-    Init_Prio_Queue(&pq);
-    Prio_Queue_Append(b, 0, heuristic(b));
+    Prio_Queue_Init(&pq);
+    Prio_Queue_Add(&pq, NULL, init_copy, 0, heuristic(init_copy), MOVE_COUNT);
 
-    Hashset* visited;
-    Hashset_Init(visited);
+    Hashset visited;
+    Hashset_Init(&visited);
+    Hashset_Add(&visited, init_copy, 0);
 
+    Node_Prio* current;
+    Node_Prio* goal_node = NULL;
 
-    // we add an initial state
+    while (pq.size > 0) {
+        current = Prio_Queue_Pop(&pq);
 
-    while(true){
+        int best_g = Hashset_Get_Min_Cost(&visited, current->board_state);
+        if (best_g != -1 && current->g > best_g) {
+            Free_Board_State(current->board_state);
+            free(current);
+            continue;
+        }
 
-        Node_Prio* current = Prio_Queue_Pop(&pq);
-        
-        // the priority queue is empty
-        if(current == NULL){
+        if (Is_Game_Over(*current->board_state)) {
+            goal_node = current;
             break;
         }
 
-        if(Is_Game_Over(current->board_state)){
-            goto clean_up;   
-        }
-        
-    
-
-        for(int i = 0; i < MOVE_COUNT; i++){
-            
-            Board_State* new_state = Make_Move_(m, current, i);
-            
-            if(!Hashset_Contains(visited, new_state)){
-                h = heuristic(new_state);
-                Prio_Queue_Append(pq, new_state, g++, h);
+        for (int i = 0; i < MOVE_COUNT; i++) {
+            Move move = (Move)i;
+            Board_State* new_state = Make_Move_Solver(m, current->board_state, move);
+            if (!new_state){
+                continue;
             }
 
-        }
+            int new_g = current->g + 1;
+            int new_h = heuristic(new_state);
 
+            int old_g = Hashset_Get_Min_Cost(&visited, new_state);
+            if (old_g != -1 && old_g <= new_g) {
+                Free_Board_State(new_state);
+                free(new_state);
+                continue;
+            }
+
+            Prio_Queue_Add(&pq, current, new_state, new_g, new_h, move);
+            Hashset_Add(&visited, new_state, new_g);   
+        }
 
     }
 
-    log_info("The game is unsolvable from the current state.");
-    return NULL;
+    Linked_List* solution = malloc(sizeof(Linked_List));
+    if (!solution) {
+        Prio_Queue_Clean(&pq);
+        Hashset_Clean(&visited);
+        return NULL;
+    }
+    Linked_List_Init(solution);
 
-clean_up:
+    if (goal_node) {
+        Node_Prio* cur = goal_node;
+        while (cur->parent != NULL) {
+            Linked_List_Append(solution, cur->m);
+            cur = cur->parent;
+        }
+    }
+
     Prio_Queue_Clean(&pq);
-    
+    Hashset_Clean(&visited);
+    Linked_List_Print(solution);
     return solution;
 }
 
-// to have a optimal heuristic, we must always overestimate the distance
-int heuristic(const Board_State b){
-    int h = 0;
-    for (int i = 0; i < b.num_boxes; i++){
-        int min = 0;
-        for(int j = 0; j < b.num_goals; j++){
-            int dist = manhattan(b.boxes[i].x, b.boxes[i].y, b.goals[j].x, b.goals[j].y);
-            if(max > dist){
-                min = dist;
-            }
-        }
-        h += min;
-    }
-    return h;
-}
 
 
 int manhattan(int x1, int y1, int x2, int y2){
@@ -147,3 +161,20 @@ int manhattan(int x1, int y1, int x2, int y2){
     int y = (y1 > y2) ? y1 - y2 : y2 - y1;
     return x + y;
 }
+
+// to have a optimal heuristic, we must always overestimate the distance
+int heuristic(const Board_State* b) {
+    int h = 0;
+    for (int i = 0; i < b->num_boxes; i++) {
+        int min_dist = INT_MAX;
+        for (int j = 0; j < b->num_goals; j++) {
+            int dist = manhattan(b->boxes[i].x, b->boxes[i].y,
+                                 b->goals[j].x, b->goals[j].y);
+            if (dist < min_dist) min_dist = dist;
+        }
+        if (min_dist != INT_MAX) h += min_dist;
+    }
+    return h;
+}
+
+

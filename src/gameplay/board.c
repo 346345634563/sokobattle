@@ -3,113 +3,99 @@
 #define MAX_LINES 256
 
 
-void Load_Level(Board* b, char* filename) {
+void Load_Level(Board* b, const char* filename) {
     char* file_data = LoadFileText(filename);
     if (!file_data) {
-        log_fatal("Level %s not found by %s.", filename, __func__);
+        log_fatal("Cannot load level file: %s", filename);
     }
 
-    char* lines[MAX_LINES];
+    char* lines[256]; 
     int line_count = 0;
     char* line = strtok(file_data, "\n");
-    while (line != NULL && line_count < MAX_LINES) {
-        lines[line_count++] = line;
+    while (line != NULL && line_count < 256) {
+        if (strlen(line) > 0 && line[0] != ';') {   
+            lines[line_count++] = line;
+        }
         line = strtok(NULL, "\n");
     }
 
-    int num_boxes = 0;
-    int num_goals = 0;
-    int section = 0;
+    if (line_count == 0) {
+        log_fatal("No valid lines in level file.");
+    }
 
+    int width = 0;
     for (int i = 0; i < line_count; i++) {
-        line = lines[i];
-        if (strcmp(line, "[Board]") == 0) section = 1;
-        else if (strcmp(line, "[Players]") == 0) section = 2;
-        else if (strcmp(line, "[Boxes]") == 0) section = 3;
-        else if (strcmp(line, "[Goals]") == 0) section = 4;
-        else {
-            if (section == 3 && strchr(line, '(')) num_boxes++;
-            if (section == 4 && strchr(line, '(')) num_goals++;
+        int len = strlen(lines[i]);
+        if (len > width) width = len;
+    }
+    int height = line_count;
+
+    b->map.width = width;
+    b->map.height = height;
+    b->map.tiles = (uint8_t**)malloc(height * sizeof(uint8_t*));
+    for (int y = 0; y < height; y++) {
+        b->map.tiles[y] = (uint8_t*)malloc(width * sizeof(uint8_t));
+        // Par défaut : vide
+        for (int x = 0; x < width; x++) {
+            b->map.tiles[y][x] = TILE_EMPTY;
         }
     }
 
-    log_info("Found %d boxes and %d goals.", num_boxes, num_goals);
-
-    b->board_state.boxes = malloc(num_boxes * sizeof(Box));
-    b->board_state.goals = malloc(num_goals * sizeof(Goal));
-    if (!b->board_state.boxes || !b->board_state.goals) {
-        log_fatal("Memory allocation failed!");
+    int num_boxes = 0, num_goals = 0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            char c = (x < strlen(lines[y])) ? lines[y][x] : ' ';
+            if (c == '$' || c == '*') num_boxes++;
+            if (c == '.' || c == '*' || c == '+') num_goals++;
+        }
     }
 
     b->board_state.num_boxes = 0;
     b->board_state.num_goals = 0;
+    b->board_state.boxes = malloc(num_boxes * sizeof(Box));
+    b->board_state.goals = malloc(num_goals * sizeof(Goal));
+    if (!b->board_state.boxes || !b->board_state.goals) {
+        log_fatal("Memory allocation failed for boxes/goals.");
+    }
 
-    int row = 0;
-    uint8_t file_x, file_y;
-    section = 0;
-
-    for (int i = 0; i < line_count; i++) {
-        line = lines[i];
-
-        if (strcmp(line, "[Board]") == 0) section = 1;
-        else if (strcmp(line, "[Players]") == 0) section = 2;
-        else if (strcmp(line, "[Boxes]") == 0) section = 3;
-        else if (strcmp(line, "[Goals]") == 0) section = 4;
-        else {
-            switch (section) {
-                case 1: // Board
-                    if (row == 0) {
-                        sscanf(line, "%hhu %hhu", &b->map.width, &b->map.height);
-                        log_info("Grid -> Width: %d, Height: %d.", b->map.width, b->map.height);
-                        b->map.tiles = (uint8_t**)malloc(b->map.height * sizeof(uint8_t*));
-                        for (int i = 0; i < b->map.height; i++) {
-                            b->map.tiles[i] = (uint8_t*)malloc(b->map.width * sizeof(uint8_t));
-                        }
-                        row++;
-                    } else {
-                        for (int col = 0; col < b->map.width; col++) {
-                            b->map.tiles[row - 1][col] = (line[col] == '1') ? TILE_WALL : TILE_EMPTY;
-                        }
-                        row++;
-                    }
-                    break;
-
-                case 2: // Player
-                    if (sscanf(line, "(%hhu,%hhu)", &file_x, &file_y) == 2) {
-                        b->board_state.p1.x = file_x;
-                        b->board_state.p1.y = file_y;
-                        log_info("Player position: %d,%d.", b->board_state.p1.x, b->board_state.p1.y);
-                    }
-                    break;
-
-                case 3: // Boxes
-                    if (sscanf(line, "(%hhu,%hhu)", &file_x, &file_y) == 2) {
-                        int idx = b->board_state.num_boxes;
-                        b->board_state.boxes[idx].x = file_x;
-                        b->board_state.boxes[idx].y = file_y;
-                        log_info("Box position: %d,%d.", file_x, file_y);
-                        b->board_state.num_boxes++;
-                    }
-                    break;
-
-                case 4: // Goals
-                    if (sscanf(line, "(%hhu,%hhu)", &file_x, &file_y) == 2) {
-                        int idx = b->board_state.num_goals;
-                        b->board_state.goals[idx].x = file_x;
-                        b->board_state.goals[idx].y = file_y;
-                        log_info("Goal position: %d,%d.", file_x, file_y);
-                        b->board_state.num_goals++;
-                    }
-                    break;
-
-                default:
-                    log_error("Unknown board specifier: %s.", line);
-                    break;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            char c = (x < strlen(lines[y])) ? lines[y][x] : ' ';
+            // Mur
+            if (c == '#') {
+                b->map.tiles[y][x] = TILE_WALL;
+            }
+            // Joueur
+            else if (c == '@' || c == '+') {
+                b->board_state.p1.x = x;
+                b->board_state.p1.y = y;
+                if (c == '+') {
+                    b->map.tiles[y][x] = TILE_EMPTY;  
+                }
+            }
+            else if (c == '$' || c == '*') {
+                int idx = b->board_state.num_boxes++;
+                b->board_state.boxes[idx].x = x;
+                b->board_state.boxes[idx].y = y;
+            }
+            if (c == '.' || c == '*' || c == '+') {
+                int idx = b->board_state.num_goals++;
+                b->board_state.goals[idx].x = x;
+                b->board_state.goals[idx].y = y;
             }
         }
     }
+    
+    b->initial_board_state.boxes = malloc(b->board_state.num_boxes * sizeof(Box));
+    b->initial_board_state.goals = malloc(b->board_state.num_goals * sizeof(Goal));
+    if (!b->initial_board_state.boxes || !b->initial_board_state.goals) {
+        log_fatal("Memory allocation failed for initial state");
+    }
+    Copy_Board_State_Reset(&b->board_state, &b->initial_board_state);
 
-    log_info("Level parsing completed: %s.", filename);
+    log_info("Level loaded: width=%d, height=%d, boxes=%d, goals=%d",
+             width, height, b->board_state.num_boxes, b->board_state.num_goals);
+
     UnloadFileText(file_data);
 }
 
@@ -189,13 +175,13 @@ bool Is_Game_Over(Board_State b){
     return true;
 }
 
-void Free_Board_State(Board* b){
-    free(b->board_state.boxes);
-    free(b->board_state.goals);
-    b->board_state.boxes = NULL;
-    b->board_state.goals = NULL;
-    b->board_state.num_boxes = 0;
-    b->board_state.num_goals = 0;
+void Free_Board_State(Board_State* b){
+    free(b->boxes);
+    free(b->goals);
+    b->boxes = NULL;
+    b->goals = NULL;
+    b->num_boxes = 0;
+    b->num_goals = 0;
 }
 
 void Free_Board(Board* b) {
@@ -206,19 +192,43 @@ void Free_Board(Board* b) {
         free(b->map.tiles);
         b->map.tiles = NULL;
     }
-    Free_Board_State(b->board_state);
+    Free_Board_State(&b->board_state);
 }
 
 
-void Copy_Board_State(Board_State* a, Board_State* b){
+Board_State* Copy_Board_State(const Board_State* src) {
+    Board_State* dst = malloc(sizeof(Board_State));
+    if (!dst) return NULL;
+
+    dst->num_boxes = src->num_boxes;
+    dst->num_goals = src->num_goals;
+    dst->p1 = src->p1;
+
+    dst->boxes = malloc(src->num_boxes * sizeof(Box));
+    dst->goals = malloc(src->num_goals * sizeof(Goal));
+
+    if (!dst->boxes || !dst->goals) {
+        free(dst->boxes);
+        free(dst->goals);
+        free(dst);
+        return NULL;
+    }
+
+    for (int i = 0; i < src->num_boxes; i++)
+        dst->boxes[i] = src->boxes[i];
+    for (int i = 0; i < src->num_goals; i++)
+        dst->goals[i] = src->goals[i];
+
+    return dst;
+}
+
+
+void Copy_Board_State_Reset(Board_State* a, Board_State* b){
     
     b->num_boxes = a->num_boxes;
     b->num_goals = a->num_goals;
     b->p1.x = a->p1.x;
     b->p1.y = a->p1.y;
-    b->goals = malloc(num_goals * sizeof(box));
-    b->boxes = malloc(num_boxes * sizeof(goal));
-
     for (int i = 0; i < b->num_boxes; i++){
         b->goals[i] = a->goals[i];
         b->boxes[i] = a->boxes[i];
@@ -233,17 +243,34 @@ bool Is_Game_Over_Handler(Board* b){
     return false;
 }
 
-void Play_Update(Board* b){
-    if(IsKeyPressed(KEY_UP)){
-        Make_Move(b->map, &b->board_state, MOVE_UP);
-    } else if(IsKeyPressed(KEY_RIGHT)){
-        Make_Move(b->map, &b->board_state, MOVE_RIGHT);
-    } else if(IsKeyPressed(KEY_DOWN)){
-        Make_Move(b->map, &b->board_state, MOVE_DOWN);
-    } else if(IsKeyPressed(KEY_LEFT)){
-        Make_Move(b->map, &b->board_state, MOVE_LEFT);
+
+/**
+ *  blocage possible -> dans un coin
+ *  contre un mur au long duquel
+ *
+ *
+ *
+ */ 
+bool Is_Solvable(const Map m,const Board_State b){
+    for(int i = 0; i < b->num_boxes; i++){
+        
+        int bi = b.boxes[i].x;
+        int bj = b.boxes[j].y;
+        
+        // blocage contre le mur
+        if(m[bi][bj+1] == WALL && m[bi+1][bj] == WALL ||   // coin inf droit
+           m[bi][bj-1] == WALL && m[bi+1][bj] == WALL ||   
+            
+                ){
+
+            return false;
+        }
+
+
+        // blocage con
+
+
+
     }
-
 }
-
 
