@@ -40,6 +40,8 @@ typedef struct goal {
     uint8_t y;
 } Goal;
 
+
+
 typedef struct board_state {
     Player p1;
     uint8_t num_boxes;
@@ -52,7 +54,9 @@ typedef struct map {
     uint8_t height;
     uint8_t width;
     uint8_t** tiles; // 2D array of Tile enum values
+    bool** dead;
 } Map;
+
 
 typedef struct board {
     Map map;
@@ -63,8 +67,10 @@ typedef struct board {
 
 
 void Load_Level(Board* b, const char* filename);
+void Compute_Dead_Tiles(Map* map, const Board_State* initial);
 void Make_Move(Map map, Board_State* b, Move move);
-bool Is_Solvable(Map map, Board_State* b);
+bool Is_Freeze_Deadlock(const Map* map, const Board_State* state);
+bool Is_Solvable(const Map map, const Board_State b);
 bool Is_Game_Over(Board_State b);
 bool Is_Game_Over_Handler(Board* b);
 void Free_Board_State(Board_State* b);

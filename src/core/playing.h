@@ -7,12 +7,6 @@
 #include "gameplay/board.h"
 #include "gameplay/solver.h"
 
-typedef enum{
-    PLAYING_CURRENT,
-    PLAYING_NEXT_LEVEL
-}Playing_State;
-
-
 
 
 void Playing_Init();

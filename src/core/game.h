@@ -14,7 +14,6 @@
 typedef struct Game{
     int screenWidth;
     int screenHeight;
-    char* level;
 }Game;
 
 void Game_Init(Game *g);

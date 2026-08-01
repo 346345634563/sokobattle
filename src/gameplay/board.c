@@ -2,6 +2,86 @@
 
 #define MAX_LINES 256
 
+void Compute_Dead_Tiles(Map* map, const Board_State* initial) {
+    int w = map->width, h = map->height;
+    int size = w * h;
+
+    bool* visited = calloc(size, sizeof(bool));
+    int* queue = malloc(size * sizeof(int));
+    int head = 0, tail = 0;
+
+    for (int i = 0; i < initial->num_goals; i++) {
+        int x = initial->goals[i].x;
+        int y = initial->goals[i].y;
+        int pos = y * w + x;
+        if (!visited[pos]) {
+            visited[pos] = true;
+            queue[tail++] = pos;
+        }
+    }
+
+    if (tail == 0) {
+        map->dead = malloc(h * sizeof(bool*));
+        for (int y = 0; y < h; y++) {
+            map->dead[y] = malloc(w * sizeof(bool));
+            for (int x = 0; x < w; x++) map->dead[y][x] = true;
+        }
+        free(visited); free(queue);
+        return;
+    }
+
+    int dx[4] = {0, 0, -1, 1};
+    int dy[4] = {-1, 1, 0, 0};
+
+    while (head < tail) {
+        int pos = queue[head++];
+        int bx = pos % w;
+        int by = pos / w;
+
+        for (int d = 0; d < 4; d++) {
+            int nx = bx + dx[d];
+            int ny = by + dy[d];
+            int px = bx - dx[d];
+            int py = by - dy[d];
+
+            if (nx >= 0 && nx < w && ny >= 0 && ny < h && map->tiles[ny][nx] != TILE_WALL &&
+                px >= 0 && px < w && py >= 0 && py < h && map->tiles[py][px] != TILE_WALL) {
+                int npos = ny * w + nx;
+                if (!visited[npos]) {
+                    visited[npos] = true;
+                    queue[tail++] = npos;
+                }
+            }
+        }
+    }
+
+    map->dead = malloc(h * sizeof(bool*));
+    for (int y = 0; y < h; y++) {
+        map->dead[y] = malloc(w * sizeof(bool));
+        for (int x = 0; x < w; x++) {
+            map->dead[y][x] = !visited[y * w + x];
+        }
+    }
+
+    printf("Dead tiles visualization (X = dead, . = live, # = wall):\n");
+    for (int y = 0; y < map->height; y++) {
+        for (int x = 0; x < map->width; x++) {
+            if (map->tiles[y][x] == TILE_WALL) {
+                printf("#");
+            } else if (map->dead[y][x]) {
+                printf("X");
+            } else {
+                printf(".");
+            }
+        }
+        printf("\n");
+    }
+
+
+    free(visited);
+    free(queue);
+}
+
 
 void Load_Level(Board* b, const char* filename) {
     char* file_data = LoadFileText(filename);
@@ -92,6 +172,9 @@ void Load_Level(Board* b, const char* filename) {
         log_fatal("Memory allocation failed for initial state");
     }
     Copy_Board_State_Reset(&b->board_state, &b->initial_board_state);
+
+    Compute_Dead_Tiles(&b->map, &b->initial_board_state);
+
 
     log_info("Level loaded: width=%d, height=%d, boxes=%d, goals=%d",
              width, height, b->board_state.num_boxes, b->board_state.num_goals);
@@ -192,6 +275,14 @@ void Free_Board(Board* b) {
         free(b->map.tiles);
         b->map.tiles = NULL;
     }
+   if (b->map.dead) {
+        for (int y = 0; y < b->map.height; y++) {
+            free(b->map.dead[y]);
+        }
+        free(b->map.dead);
+        b->map.dead = NULL;
+    }
+
     Free_Board_State(&b->board_state);
 }
 
@@ -243,34 +334,144 @@ bool Is_Game_Over_Handler(Board* b){
     return false;
 }
 
-
-/**
- *  blocage possible -> dans un coin
- *  contre un mur au long duquel
- *
- *
- *
- */ 
-bool Is_Solvable(const Map m,const Board_State b){
-    for(int i = 0; i < b->num_boxes; i++){
-        
-        int bi = b.boxes[i].x;
-        int bj = b.boxes[j].y;
-        
-        // blocage contre le mur
-        if(m[bi][bj+1] == WALL && m[bi+1][bj] == WALL ||   // coin inf droit
-           m[bi][bj-1] == WALL && m[bi+1][bj] == WALL ||   
-            
-                ){
-
-            return false;
+/*
+// Check if a box is blocked along the horizontal axis
+bool Is_Box_Blocked_Horizontal(const Map* map, const Board_State* state, 
+                                int box_x, int box_y, bool* frozen_boxes) {
+    // Check left and right sides
+    bool left_blocked = false;
+    bool right_blocked = false;
+    
+    // Left side
+    if (box_x - 1 < 0 || map->tiles[box_y][box_x - 1] == TILE_WALL) {
+        left_blocked = true;
+    } else {
+        // Check if there's a box on the left that's frozen
+        for (int i = 0; i < state->num_boxes; i++) {
+            if (state->boxes[i].x == box_x - 1 && state->boxes[i].y == box_y) {
+                if (frozen_boxes[i]) left_blocked = true;
+                break;
+            }
         }
-
-
-        // blocage con
-
-
-
+        // Or if it's a dead square
+        if (!left_blocked && map->dead[box_y][box_x - 1]) left_blocked = true;
     }
+    
+    // Right side
+    if (box_x + 1 >= map->width || map->tiles[box_y][box_x + 1] == TILE_WALL) {
+        right_blocked = true;
+    } else {
+        for (int i = 0; i < state->num_boxes; i++) {
+            if (state->boxes[i].x == box_x + 1 && state->boxes[i].y == box_y) {
+                if (frozen_boxes[i]) right_blocked = true;
+                break;
+            }
+        }
+        if (!right_blocked && map->dead[box_y][box_x + 1]) right_blocked = true;
+    }
+    
+    return left_blocked && right_blocked;
+}
+
+// Check if a box is blocked along the vertical axis
+bool Is_Box_Blocked_Vertical(const Map* map, const Board_State* state,
+                              int box_x, int box_y, bool* frozen_boxes) {
+    bool up_blocked = false;
+    bool down_blocked = false;
+    
+    // Up side
+    if (box_y - 1 < 0 || map->tiles[box_y - 1][box_x] == TILE_WALL) {
+        up_blocked = true;
+    } else {
+        for (int i = 0; i < state->num_boxes; i++) {
+            if (state->boxes[i].x == box_x && state->boxes[i].y == box_y - 1) {
+                if (frozen_boxes[i]) up_blocked = true;
+                break;
+            }
+        }
+        if (!up_blocked && map->dead[box_y - 1][box_x]) up_blocked = true;
+    }
+    
+    // Down side
+    if (box_y + 1 >= map->height || map->tiles[box_y + 1][box_x] == TILE_WALL) {
+        down_blocked = true;
+    } else {
+        for (int i = 0; i < state->num_boxes; i++) {
+            if (state->boxes[i].x == box_x && state->boxes[i].y == box_y + 1) {
+                if (frozen_boxes[i]) down_blocked = true;
+                break;
+            }
+        }
+        if (!down_blocked && map->dead[box_y + 1][box_x]) down_blocked = true;
+    }
+    
+    return up_blocked && down_blocked;
+}
+
+// Main freeze deadlock detection - recursive because boxes can block each other[reference:5]
+bool Is_Freeze_Deadlock(const Map* map, const Board_State* state) {
+    int num_boxes = state->num_boxes;
+    bool* frozen = calloc(num_boxes, sizeof(bool));
+    bool changed = true;
+    
+    // Iteratively mark frozen boxes (boxes can freeze other boxes)
+    while (changed) {
+        changed = false;
+        for (int i = 0; i < num_boxes; i++) {
+            if (frozen[i]) continue;
+            
+            int bx = state->boxes[i].x;
+            int by = state->boxes[i].y;
+            
+            bool horiz_blocked = Is_Box_Blocked_Horizontal(map, state, bx, by, frozen);
+            bool vert_blocked = Is_Box_Blocked_Vertical(map, state, bx, by, frozen);
+            
+            if (horiz_blocked && vert_blocked) {
+                frozen[i] = true;
+                changed = true;
+            }
+        }
+    }
+    
+    // If any frozen box is NOT on a goal → deadlock[reference:6]
+    for (int i = 0; i < num_boxes; i++) {
+        if (!frozen[i]) continue;
+        
+        bool on_goal = false;
+        for (int j = 0; j < state->num_goals; j++) {
+            if (state->boxes[i].x == state->goals[j].x && 
+                state->boxes[i].y == state->goals[j].y) {
+                on_goal = true;
+                break;
+            }
+        }
+        if (!on_goal) {
+            log_info("Freeze deadlock detected: box %d at (%d,%d)", i, state->boxes[i].x, state->boxes[i].y);
+
+            free(frozen);
+            return true;  // Deadlock!
+        }
+    }
+    
+    free(frozen);
+    return false;
+}
+*/
+bool Is_Wall_Blocked(const Map m, const Board_State b) {
+    for (int i = 0; i < b.num_boxes; i++) {
+        int x = b.boxes[i].x;
+        int y = b.boxes[i].y;
+        if (m.dead[y][x]) {  
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+
+bool Is_Solvable(const Map m, const Board_State b) {
+    return !Is_Wall_Blocked(m, b);   
 }
 
